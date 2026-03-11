@@ -22,28 +22,20 @@
                   radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.18), transparent 30%),
                   linear-gradient(145deg, var(--bg-1), var(--bg-2));
       touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-      user-select: none; -webkit-user-select: none;
+      user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
     .app { width: 100%; max-width: 980px; background: var(--panel); border: 1px solid var(--panel-border);
            border-radius: 28px; box-shadow: var(--shadow); backdrop-filter: blur(18px); overflow: hidden; }
-    .header { display: flex; flex-direction: column; gap: 12px; padding: 20px 20px 14px; }
+    .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 20px 14px; flex-wrap: wrap; }
     .title-wrap h1 { margin: 0; font-size: 1.6rem; }
     .title-wrap p { margin: 6px 0 0; color: var(--muted); font-size: 0.85rem; }
-    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .difficulty, .button {
       border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.06);
       color: var(--text); border-radius: 12px; height: 42px; padding: 0 14px; font-size: 0.9rem;
     }
-    .difficulty { cursor: pointer; flex: 1; }
+    .difficulty { cursor: pointer; }
     .button { cursor: pointer; font-weight: 700; }
-    .mode-toggle { display: flex; gap: 8px; width: 100%; margin-top: 8px; }
-    .mode-btn {
-      flex: 1; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.06);
-      color: var(--muted); border-radius: 12px; height: 48px; font-size: 0.9rem;
-      cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;
-    }
-    .mode-btn.active { background: rgba(56, 189, 248, 0.25); color: var(--accent); border-color: var(--accent); }
-    .mode-btn .icon { font-size: 1.2rem; }
     .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 20px 18px; }
     .stat { height: auto; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
             border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.06); border-radius: 12px; }
@@ -59,7 +51,7 @@
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08));
       box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16), 0 6px 14px rgba(2, 8, 23, 0.18);
       transition: transform 0.1s ease, background 0.12s ease; touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
+      -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none;
     }
     .cell:active:not(.revealed):not(.flagged) { transform: scale(0.95); }
     .cell.revealed { cursor: default; background: rgba(15, 23, 42, 0.62); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
@@ -74,10 +66,11 @@
                  color: #4ade80; font-size: 0.8rem; display: none; }
     .liff-info.show { display: block; }
     @media (max-width: 600px) {
-      :root { --cell-size: 30px; }
+      :root { --cell-size: 32px; }
       body { padding: 10px; }
       .header, .stats, .board-wrap, .footer { padding-left: 14px; padding-right: 14px; }
-      .mode-btn { height: 44px; font-size: 0.85rem; }
+      .controls { width: 100%; justify-content: space-between; }
+      .difficulty, .button { flex: 1; min-width: 80px; }
     }
   </style>
 </head>
@@ -86,7 +79,7 @@
     <section class="header">
       <div class="title-wrap">
         <h1>💣 踩地雷</h1>
-        <p>經典遊戲，優化觸控體驗</p>
+        <p>短按揭露 · 長按插旗</p>
       </div>
       <div class="controls">
         <select id="difficulty" class="difficulty" aria-label="選擇難度">
@@ -95,10 +88,6 @@
           <option value="hard">困難 16×30</option>
         </select>
         <button id="new-game" class="button" type="button">新遊戲</button>
-      </div>
-      <div class="mode-toggle">
-        <button id="mode-reveal" class="mode-btn active"><span class="icon">👆</span> 點擊揭露</button>
-        <button id="mode-flag" class="mode-btn"><span class="icon">🚩</span> 點擊插旗</button>
       </div>
     </section>
 
@@ -119,11 +108,124 @@
       </div>
     </section>
 
-    <div class="footer">切換上方的模式來揭露或插旗</div>
+    <div class="footer">短按揭露格子 · 長按插旗（會震動）</div>
     <div id="liff-info" class="liff-info">✅ 在 LINE 中執行</div>
   </main>
 
   <script>
+    // 觸控長按處理
+    class LongPressHandler {
+      constructor(element, onLongPress, onClick, options = {}) {
+        this.element = element;
+        this.onLongPress = onLongPress;
+        this.onClick = onClick;
+        this.duration = options.duration || 350;
+        this.preventDefault = options.preventDefault !== false;
+        
+        this.timer = null;
+        this.startX = 0;
+        this.startY = 0;
+        this.hasMoved = false;
+        
+        this.bindEvents();
+      }
+      
+      bindEvents() {
+        // 觸控事件
+        this.element.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: false });
+        this.element.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+        this.element.addEventListener('touchend', this.handleTouchEnd.bind(this), { passive: false });
+        this.element.addEventListener('touchcancel', this.handleTouchEnd.bind(this), { passive: false });
+        
+        // 滑鼠事件（桌面）
+        this.element.addEventListener('mousedown', this.handleMouseDown.bind(this));
+        this.element.addEventListener('mouseup', this.handleMouseUp.bind(this));
+        this.element.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
+        this.element.addEventListener('contextmenu', (e) => e.preventDefault());
+      }
+      
+      handleTouchStart(e) {
+        if (e.touches.length !== 1) return;
+        
+        this.startX = e.touches[0].clientX;
+        this.startY = e.touches[0].clientY;
+        this.hasMoved = false;
+        
+        if (this.preventDefault) e.preventDefault();
+        
+        this.timer = setTimeout(() => {
+          this.hasMoved = true;
+          this.triggerHaptic();
+          this.onLongPress();
+        }, this.duration);
+      }
+      
+      handleTouchMove(e) {
+        if (!this.timer) return;
+        
+        const dx = Math.abs(e.touches[0].clientX - this.startX);
+        const dy = Math.abs(e.touches[0].clientY - this.startY);
+        
+        if (dx > 10 || dy > 10) {
+          this.clearTimer();
+          this.hasMoved = true;
+        }
+      }
+      
+      handleTouchEnd(e) {
+        if (this.preventDefault) e.preventDefault();
+        
+        this.clearTimer();
+        
+        if (!this.hasMoved) {
+          this.onClick();
+        }
+      }
+      
+      handleMouseDown(e) {
+        if (e.button !== 0) return;
+        this.startX = e.clientX;
+        this.startY = e.clientY;
+        
+        this.timer = setTimeout(() => {
+          this.onLongPress();
+        }, this.duration);
+      }
+      
+      handleMouseUp(e) {
+        this.clearTimer();
+        if (!this.hasMoved && e.button === 0) {
+          this.onClick();
+        }
+      }
+      
+      handleMouseLeave() {
+        this.clearTimer();
+      }
+      
+      clearTimer() {
+        if (this.timer) {
+          clearTimeout(this.timer);
+          this.timer = null;
+        }
+      }
+      
+      triggerHaptic() {
+        // 多种震动方案
+        if (navigator.vibrate) {
+          navigator.vibrate(50);
+        }
+        // Android haptic feedback
+        if (window.HapticFeedback && window.HapticFeedback.vibrate) {
+          window.HapticFeedback.vibrate(50);
+        }
+        // MIUI haptic
+        if (window.miui && window.miui.vibrate) {
+          window.miui.vibrate(30);
+        }
+      }
+    }
+
     async function initLIFF() {
       try {
         await liff.init({ liffId: '2009416166-3S9jtxfm' });
@@ -142,22 +244,10 @@
     const minesLeftElement = document.getElementById('mines-left');
     const difficultyElement = document.getElementById('difficulty');
     const newGameButton = document.getElementById('new-game');
-    const modeRevealBtn = document.getElementById('mode-reveal');
-    const modeFlagBtn = document.getElementById('mode-flag');
 
     let grid = [], currentConfig = configs.easy, firstMove = true;
     let flaggedCount = 0, revealedCount = 0, gameOver = false;
     let timer = 0, timerId = null;
-    let currentMode = 'reveal'; // 'reveal' or 'flag'
-
-    function setMode(mode) {
-      currentMode = mode;
-      modeRevealBtn.classList.toggle('active', mode === 'reveal');
-      modeFlagBtn.classList.toggle('active', mode === 'flag');
-    }
-
-    modeRevealBtn.addEventListener('click', () => setMode('reveal'));
-    modeFlagBtn.addEventListener('click', () => setMode('flag'));
 
     function createCell(row, col) {
       return { row, col, isMine: false, adjacent: 0, revealed: false, flagged: false, element: null };
@@ -183,16 +273,12 @@
           btn.className = 'cell';
           btn.setAttribute('aria-label', `格子 ${row + 1}, ${col + 1}`);
           
-          btn.addEventListener('click', () => {
-            if (currentMode === 'reveal') handleReveal(row, col);
-            else handleFlag(row, col);
-          });
-          
-          // 桌面版右鍵
-          btn.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            handleFlag(row, col);
-          });
+          // 使用 LongPressHandler
+          new LongPressHandler(
+            btn,
+            () => handleFlag(row, col),  // 長按
+            () => handleReveal(row, col)  // 短按
+          );
           
           grid[row][col].element = btn;
           boardElement.appendChild(btn);
