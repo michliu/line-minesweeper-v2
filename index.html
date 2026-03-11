@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>踩地雷 - Minesweeper</title>
+  <script src="https://static.line-scdn.net/liff/2.14/sdk.js"></script>
+  <style>
+    :root {
+      --bg-1: #0f172a;
+      --bg-2: #1e293b;
+      --panel: rgba(15, 23, 42, 0.76);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-2: #22c55e;
+      --danger: #f43f5e;
+      --warning: #f59e0b;
+      --shadow: 0 20px 50px rgba(2, 8, 23, 0.45);
+      --cell-size: 38px;
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.22), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.18), transparent 30%),
+        linear-gradient(145deg, var(--bg-1), var(--bg-2));
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 980px;
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+      overflow: hidden;
+    }
+
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 20px 20px 14px;
+      flex-wrap: wrap;
+    }
+
+    .title-wrap h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      letter-spacing: 0.02em;
+    }
+
+    .title-wrap p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .difficulty,
+    .button {
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      border-radius: 12px;
+      height: 42px;
+      padding: 0 14px;
+      font-size: 0.9rem;
+    }
+
+    .difficulty {
+      cursor: pointer;
+      outline: none;
+    }
+
+    .button {
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform 0.16s ease, background 0.16s ease;
+    }
+
+    .button:hover {
+      transform: translateY(-1px);
+      background: rgba(56, 189, 248, 0.18);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      padding: 0 20px 18px;
+    }
+
+    .stat {
+      height: auto;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .stat-value {
+      font-size: 1.3rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .board-wrap {
+      padding: 0 20px 20px;
+    }
+
+    .board-shell {
+      overflow: auto;
+      border-radius: var(--radius);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+      padding: 14px;
+    }
+
+    .board {
+      display: grid;
+      gap: 5px;
+      width: max-content;
+      margin: 0 auto;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    .cell {
+      width: var(--cell-size);
+      height: var(--cell-size);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--text);
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.08));
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.16),
+        0 6px 14px rgba(2, 8, 23, 0.18);
+      transition: transform 0.1s ease, background 0.12s ease;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    .cell:active:not(.revealed):not(.flagged) {
+      transform: scale(0.95);
+    }
+
+    .cell.revealed {
+      cursor: default;
+      background: rgba(15, 23, 42, 0.62);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .cell.mine {
+      background: linear-gradient(180deg, rgba(244, 63, 94, 0.45), rgba(127, 29, 29, 0.8));
+    }
+
+    .cell.flagged {
+      background: linear-gradient(180deg, rgba(245, 158, 11, 0.38), rgba(120, 53, 15, 0.75));
+    }
+
+    .cell:disabled {
+      opacity: 1;
+    }
+
+    .n1 { color: #60a5fa; }
+    .n2 { color: #34d399; }
+    .n3 { color: #f87171; }
+    .n4 { color: #a78bfa; }
+    .n5 { color: #fb7185; }
+    .n6 { color: #22d3ee; }
+    .n7 { color: #facc15; }
+    .n8 { color: #cbd5e1; }
+
+    .footer {
+      padding: 0 20px 20px;
+      color: var(--muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+
+    .liff-info {
+      padding: 10px 20px;
+      background: rgba(34, 197, 94, 0.15);
+      border-top: 1px solid rgba(34, 197, 94, 0.3);
+      color: #4ade80;
+      font-size: 0.8rem;
+      display: none;
+    }
+
+    .liff-info.show {
+      display: block;
+    }
+
+    @media (max-width: 600px) {
+      :root {
+        --cell-size: 32px;
+      }
+
+      body {
+        padding: 10px;
+      }
+
+      .header,
+      .stats,
+      .board-wrap,
+      .footer {
+        padding-left: 14px;
+        padding-right: 14px;
+      }
+
+      .stats {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .controls {
+        width: 100%;
+        justify-content: space-between;
+      }
+
+      .difficulty,
+      .button {
+        flex: 1;
+        min-width: 100px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="header">
+      <div class="title-wrap">
+        <h1>💣 踩地雷</h1>
+        <p>經典遊戲，優化觸控體驗</p>
+      </div>
+      <div class="controls">
+        <select id="difficulty" class="difficulty" aria-label="選擇難度">
+          <option value="easy">簡單 9×9</option>
+          <option value="medium">中等 16×16</option>
+          <option value="hard">困難 16×30</option>
+        </select>
+        <button id="new-game" class="button" type="button">新遊戲</button>
+      </div>
+    </section>
+
+    <section class="stats">
+      <div class="stat">
+        <span class="stat-label">🚩 剩餘</span>
+        <span id="mines-left" class="stat-value">10</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">⏱️ 時間</span>
+        <span id="timer" class="stat-value">000</span>
+      </div>
+    </section>
+
+    <section class="board-wrap">
+      <div class="board-shell">
+        <div id="board" class="board" aria-label="踩地雷棋盤"></div>
+      </div>
+    </section>
+
+    <div class="footer">點擊揭露 · 長按或右鍵插旗</div>
+    
+    <div id="liff-info" class="liff-info">
+      ✅ 在 LINE 中執行
+    </div>
+  </main>
+
+  <script>
+    // LIFF 初始化
+    async function initLIFF() {
+      try {
+        await liff.init({
+          liffId: '2009416166-3S9jtxfm' // 需要替換為你的 LIFF ID
+        });
+        
+        if (liff.isInClient()) {
+          document.getElementById('liff-info').classList.add('show');
+        }
+        
+        console.log('LIFF initialized:', liff.getContext());
+      } catch (error) {
+        console.log('LIFF init failed (not in LINE):', error);
+      }
+    }
+
+    const configs = {
+      easy: { rows: 9, cols: 9, mines: 10 },
+      medium: { rows: 16, cols: 16, mines: 40 },
+      hard: { rows: 16, cols: 30, mines: 99 },
+    };
+
+    const boardElement = document.getElementById('board');
+    const timerElement = document.getElementById('timer');
+    const minesLeftElement = document.getElementById('mines-left');
+    const difficultyElement = document.getElementById('difficulty');
+    const newGameButton = document.getElementById('new-game');
+
+    let grid = [];
+    let currentConfig = configs.easy;
+    let firstMove = true;
+    let flaggedCount = 0;
+    let revealedCount = 0;
+    let gameOver = false;
+    let timer = 0;
+    let timerId = null;
+    let contextMenuTimer = null;
+
+    function createCell(row, col) {
+      return {
+        row,
+        col,
+        isMine: false,
+        adjacent: 0,
+        revealed: false,
+        flagged: false,
+        element: null,
+      };
+    }
+
+    function initGame() {
+      currentConfig = configs[difficultyElement.value];
+      firstMove = true;
+      flaggedCount = 0;
+      revealedCount = 0;
+      gameOver = false;
+      timer = 0;
+      clearInterval(timerId);
+      timerId = null;
+      timerElement.textContent = '000';
+      minesLeftElement.textContent = currentConfig.mines;
+      boardElement.innerHTML = '';
+      boardElement.style.gridTemplateColumns = `repeat(${currentConfig.cols}, var(--cell-size))`;
+      grid = Array.from({ length: currentConfig.rows }, (_, row) => (
+        Array.from({ length: currentConfig.cols }, (_, col) => createCell(row, col))
+      ));
+
+      for (let row = 0; row < currentConfig.rows; row += 1) {
+        for (let col = 0; col < currentConfig.cols; col += 1) {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'cell';
+          button.setAttribute('aria-label', `格子 ${row + 1}, ${col + 1}`);
+          
+          // 觸控支援：短按揭露，長按插旗
+          button.addEventListener('click', () => handleReveal(row, col));
+          button.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            handleFlag(row, col);
+          });
+          
+          // 長按支援 (觸控設備)
+          button.addEventListener('touchstart', (e) => {
+            contextMenuTimer = setTimeout(() => {
+              e.preventDefault();
+              handleFlag(row, col);
+            }, 500);
+          });
+          button.addEventListener('touchend', () => {
+            if (contextMenuTimer) {
+              clearTimeout(contextMenuTimer);
+              contextMenuTimer = null;
+            }
+          });
+          
+          grid[row][col].element = button;
+          boardElement.appendChild(button);
+        }
+      }
+    }
+
+    function startTimer() {
+      if (timerId || gameOver) {
+        return;
+      }
+      timerId = setInterval(() => {
+        timer += 1;
+        timerElement.textContent = String(Math.min(timer, 999)).padStart(3, '0');
+      }, 1000);
+    }
+
+    function inBounds(row, col) {
+      return row >= 0 && row < currentConfig.rows && col >= 0 && col < currentConfig.cols;
+    }
+
+    function getNeighbors(row, col) {
+      const neighbors = [];
+      for (let rowOffset = -1; rowOffset <= 1; rowOffset += 1) {
+        for (let colOffset = -1; colOffset <= 1; colOffset += 1) {
+          if (rowOffset === 0 && colOffset === 0) {
+            continue;
+          }
+          const nextRow = row + rowOffset;
+          const nextCol = col + colOffset;
+          if (inBounds(nextRow, nextCol)) {
+            neighbors.push(grid[nextRow][nextCol]);
+          }
+        }
+      }
+      return neighbors;
+    }
+
+    function placeMines(safeRow, safeCol) {
+      const candidates = [];
+      for (let row = 0; row < currentConfig.rows; row += 1) {
+        for (let col = 0; col < currentConfig.cols; col += 1) {
+          if (row === safeRow && col === safeCol) {
+            continue;
+          }
+          candidates.push(grid[row][col]);
+        }
+      }
+
+      for (let i = candidates.length - 1; i > 0; i -= 1) {
+        const swapIndex = Math.floor(Math.random() * (i + 1));
+        [candidates[i], candidates[swapIndex]] = [candidates[swapIndex], candidates[i]];
+      }
+
+      for (let i = 0; i < currentConfig.mines; i += 1) {
+        candidates[i].isMine = true;
+      }
+
+      for (let row = 0; row < currentConfig.rows; row += 1) {
+        for (let col = 0; col < currentConfig.cols; col += 1) {
+          const cell = grid[row][col];
+          if (cell.isMine) {
+            continue;
+          }
+          cell.adjacent = getNeighbors(row, col).filter((neighbor) => neighbor.isMine).length;
+        }
+      }
+    }
+
+    function handleReveal(row, col) {
+      if (gameOver) {
+        return;
+      }
+
+      const cell = grid[row][col];
+      if (cell.revealed || cell.flagged) {
+        return;
+      }
+
+      if (firstMove) {
+        placeMines(row, col);
+        firstMove = false;
+        startTimer();
+      }
+
+      revealCell(cell);
+      checkWin();
+    }
+
+    function revealCell(cell) {
+      if (cell.revealed || cell.flagged) {
+        return;
+      }
+
+      cell.revealed = true;
+      revealedCount += 1;
+      const button = cell.element;
+      button.classList.add('revealed');
+      button.disabled = true;
+
+      if (cell.isMine) {
+        button.classList.add('mine');
+        button.textContent = '💣';
+        endGame(false);
+        return;
+      }
+
+      if (cell.adjacent > 0) {
+        button.textContent = String(cell.adjacent);
+        button.classList.add(`n${cell.adjacent}`);
+        return;
+      }
+
+      for (const neighbor of getNeighbors(cell.row, cell.col)) {
+        if (!neighbor.revealed && !neighbor.isMine) {
+          revealCell(neighbor);
+        }
+      }
+    }
+
+    function handleFlag(row, col) {
+      if (gameOver) {
+        return;
+      }
+
+      const cell = grid[row][col];
+      if (cell.revealed) {
+        return;
+      }
+
+      if (firstMove) {
+        startTimer();
+      }
+
+      cell.flagged = !cell.flagged;
+      flaggedCount += cell.flagged ? 1 : -1;
+      cell.element.classList.toggle('flagged', cell.flagged);
+      cell.element.textContent = cell.flagged ? '🚩' : '';
+      minesLeftElement.textContent = currentConfig.mines - flaggedCount;
+    }
+
+    function revealAllMines() {
+      for (const row of grid) {
+        for (const cell of row) {
+          if (cell.isMine) {
+            cell.element.classList.add('revealed', 'mine');
+            cell.element.textContent = '💣';
+          }
+          cell.element.disabled = true;
+        }
+      }
+    }
+
+    function checkWin() {
+      const safeCells = currentConfig.rows * currentConfig.cols - currentConfig.mines;
+      if (!gameOver && revealedCount === safeCells) {
+        endGame(true);
+      }
+    }
+
+    function endGame(didWin) {
+      gameOver = true;
+      clearInterval(timerId);
+      timerId = null;
+
+      if (!didWin) {
+        revealAllMines();
+        showAlert('💥 爆炸了！遊戲結束。');
+        return;
+      }
+
+      for (const row of grid) {
+        for (const cell of row) {
+          cell.element.disabled = true;
+          if (cell.isMine && !cell.flagged) {
+            cell.flagged = true;
+            cell.element.textContent = '🚩';
+            cell.element.classList.add('flagged');
+          }
+        }
+      }
+      minesLeftElement.textContent = '0';
+      showAlert('🎉 恭喜！你赢了！');
+    }
+
+    // 支援 LINE 內的 alert
+    function showAlert(message) {
+      if (typeof liff !== 'undefined' && liff.isInClient()) {
+        // 在 LINE 中嘗試使用簡單的 DOM 顯示
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0,0,0,0.8);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 9999;
+          font-size: 1.2rem;
+          color: white;
+          padding: 20px;
+          text-align: center;
+        `;
+        overlay.textContent = message;
+        overlay.addEventListener('click', () => overlay.remove());
+        document.body.appendChild(overlay);
+      } else {
+        alert(message);
+      }
+    }
+
+    difficultyElement.addEventListener('change', initGame);
+    newGameButton.addEventListener('click', initGame);
+
+    // 啟動
+    initLIFF().then(() => {
+      initGame();
+    });
+  </script>
+</body>
+</html>
