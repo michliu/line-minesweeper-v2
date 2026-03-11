@@ -7,19 +7,10 @@
   <script src="https://static.line-scdn.net/liff/2.14/sdk.js"></script>
   <style>
     :root {
-      --bg-1: #0f172a;
-      --bg-2: #1e293b;
-      --panel: rgba(15, 23, 42, 0.76);
-      --panel-border: rgba(255, 255, 255, 0.12);
-      --text: #e2e8f0;
-      --muted: #94a3b8;
-      --accent: #38bdf8;
-      --accent-2: #22c55e;
-      --danger: #f43f5e;
-      --warning: #f59e0b;
-      --shadow: 0 20px 50px rgba(2, 8, 23, 0.45);
-      --cell-size: 38px;
-      --radius: 22px;
+      --bg-1: #0f172a; --bg-2: #1e293b; --panel: rgba(15, 23, 42, 0.76);
+      --panel-border: rgba(255, 255, 255, 0.12); --text: #e2e8f0; --muted: #94a3b8;
+      --accent: #38bdf8; --accent-2: #22c55e; --danger: #f43f5e; --warning: #f59e0b;
+      --shadow: 0 20px 50px rgba(2, 8, 23, 0.45); --cell-size: 38px; --radius: 22px;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; padding: 0; min-height: 100vh; overflow-x: hidden; }
@@ -35,24 +26,24 @@
     }
     .app { width: 100%; max-width: 980px; background: var(--panel); border: 1px solid var(--panel-border);
            border-radius: 28px; box-shadow: var(--shadow); backdrop-filter: blur(18px); overflow: hidden; }
-    .header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 20px 20px 14px; flex-wrap: wrap; }
+    .header { display: flex; flex-direction: column; gap: 12px; padding: 20px 20px 14px; }
     .title-wrap h1 { margin: 0; font-size: 1.6rem; }
     .title-wrap p { margin: 6px 0 0; color: var(--muted); font-size: 0.85rem; }
-    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .difficulty, .button {
       border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.06);
       color: var(--text); border-radius: 12px; height: 42px; padding: 0 14px; font-size: 0.9rem;
     }
-    .difficulty { cursor: pointer; }
-    .button { cursor: pointer; font-weight: 700; transition: transform 0.16s ease; }
-    .button:hover { transform: translateY(-1px); background: rgba(56, 189, 248, 0.18); }
-    .mode-toggle { display: flex; gap: 8px; }
+    .difficulty { cursor: pointer; flex: 1; }
+    .button { cursor: pointer; font-weight: 700; }
+    .mode-toggle { display: flex; gap: 8px; width: 100%; margin-top: 8px; }
     .mode-btn {
-      border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.06);
-      color: var(--muted); border-radius: 12px; height: 42px; padding: 0 14px; font-size: 0.85rem;
-      cursor: pointer; transition: all 0.2s ease;
+      flex: 1; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.06);
+      color: var(--muted); border-radius: 12px; height: 48px; font-size: 0.9rem;
+      cursor: pointer; transition: all 0.2s ease; display: flex; align-items: center; justify-content: center; gap: 6px;
     }
     .mode-btn.active { background: rgba(56, 189, 248, 0.25); color: var(--accent); border-color: var(--accent); }
+    .mode-btn .icon { font-size: 1.2rem; }
     .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0 20px 18px; }
     .stat { height: auto; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
             border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.06); border-radius: 12px; }
@@ -83,11 +74,10 @@
                  color: #4ade80; font-size: 0.8rem; display: none; }
     .liff-info.show { display: block; }
     @media (max-width: 600px) {
-      :root { --cell-size: 32px; }
+      :root { --cell-size: 30px; }
       body { padding: 10px; }
       .header, .stats, .board-wrap, .footer { padding-left: 14px; padding-right: 14px; }
-      .controls { width: 100%; justify-content: space-between; }
-      .difficulty, .button, .mode-btn { flex: 1; min-width: 80px; }
+      .mode-btn { height: 44px; font-size: 0.85rem; }
     }
   </style>
 </head>
@@ -105,6 +95,10 @@
           <option value="hard">困難 16×30</option>
         </select>
         <button id="new-game" class="button" type="button">新遊戲</button>
+      </div>
+      <div class="mode-toggle">
+        <button id="mode-reveal" class="mode-btn active"><span class="icon">👆</span> 點擊揭露</button>
+        <button id="mode-flag" class="mode-btn"><span class="icon">🚩</span> 點擊插旗</button>
       </div>
     </section>
 
@@ -125,12 +119,11 @@
       </div>
     </section>
 
-    <div class="footer">點擊揭露 · 長按插旗</div>
+    <div class="footer">切換上方的模式來揭露或插旗</div>
     <div id="liff-info" class="liff-info">✅ 在 LINE 中執行</div>
   </main>
 
   <script>
-    // LIFF 初始化
     async function initLIFF() {
       try {
         await liff.init({ liffId: '2009416166-3S9jtxfm' });
@@ -149,12 +142,22 @@
     const minesLeftElement = document.getElementById('mines-left');
     const difficultyElement = document.getElementById('difficulty');
     const newGameButton = document.getElementById('new-game');
+    const modeRevealBtn = document.getElementById('mode-reveal');
+    const modeFlagBtn = document.getElementById('mode-flag');
 
     let grid = [], currentConfig = configs.easy, firstMove = true;
     let flaggedCount = 0, revealedCount = 0, gameOver = false;
     let timer = 0, timerId = null;
-    let longPressTimer = null;
-    let isLongPress = false;
+    let currentMode = 'reveal'; // 'reveal' or 'flag'
+
+    function setMode(mode) {
+      currentMode = mode;
+      modeRevealBtn.classList.toggle('active', mode === 'reveal');
+      modeFlagBtn.classList.toggle('active', mode === 'flag');
+    }
+
+    modeRevealBtn.addEventListener('click', () => setMode('reveal'));
+    modeFlagBtn.addEventListener('click', () => setMode('flag'));
 
     function createCell(row, col) {
       return { row, col, isMine: false, adjacent: 0, revealed: false, flagged: false, element: null };
@@ -180,41 +183,16 @@
           btn.className = 'cell';
           btn.setAttribute('aria-label', `格子 ${row + 1}, ${col + 1}`);
           
-          // 點擊揭露
-          btn.addEventListener('click', (e) => {
-            if (!isLongPress) handleReveal(row, col);
-            isLongPress = false;
+          btn.addEventListener('click', () => {
+            if (currentMode === 'reveal') handleReveal(row, col);
+            else handleFlag(row, col);
           });
           
-          // 長按插旗 - 使用 mousedown + mouseup + contextmenu
+          // 桌面版右鍵
           btn.addEventListener('contextmenu', (e) => {
             e.preventDefault();
             handleFlag(row, col);
           });
-          
-          // 觸控長按支援
-          let touchStartTime = 0;
-          btn.addEventListener('touchstart', (e) => {
-            touchStartTime = Date.now();
-            longPressTimer = setTimeout(() => {
-              isLongPress = true;
-              handleFlag(row, col);
-              // 震動反饋
-              if (navigator.vibrate) navigator.vibrate(50);
-            }, 400);
-          }, { passive: true });
-          
-          btn.addEventListener('touchend', (e) => {
-            const touchDuration = Date.now() - touchStartTime;
-            clearTimeout(longPressTimer);
-            if (touchDuration < 400) {
-              // 短按
-            }
-          }, { passive: true });
-          
-          btn.addEventListener('touchmove', () => {
-            clearTimeout(longPressTimer);
-          }, { passive: true });
           
           grid[row][col].element = btn;
           boardElement.appendChild(btn);
